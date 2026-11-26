@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ytgrab
+Comment=Download YouTube videos, playlists, and RD Auto-Mixes via yt-dlp
+Exec=/usr/bin/ytgrab
+Icon=ytgrab
+Terminal=false
+Type=Application
+Categories=AudioVideo;Network;Utility;
+Keywords=youtube;yt-dlp;mp3;download;playlist;
