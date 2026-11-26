@@ -1,6 +1,6 @@
 # Maintainer: Bravin Evans Kiplagat <bravinevans1@gmail.com>
 pkgname=ytgrab
-pkgver=0.3.0
+pkgver=0.4.0
 pkgrel=1
 pkgdesc="Minimalist PyQt6 GUI for yt-dlp with automatic RD Mix URL resolution and anti-403 pacing"
 arch=('any')

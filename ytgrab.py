@@ -56,6 +56,12 @@ QLineEdit, QComboBox, QSpinBox, QPlainTextEdit#UrlBox {
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit#UrlBox:focus {
     border: 1px solid #6b7280;
 }
+QComboBox QAbstractItemView {
+    background-color: #1c1e21;
+    color: #f0f2f5;
+    border: 1px solid #383c43;
+    selection-background-color: #32363d;
+}
 QPushButton {
     background-color: #272a2f;
     border: 1px solid #383c43;
@@ -254,30 +260,34 @@ class YTGrabWindow(QMainWindow):
         opts_row.addWidget(self.limit_spin)
         card_layout.addLayout(opts_row)
 
-        # Resilience & Metadata Row 1
+        # Metadata & Archive Row
         flags_row1 = QHBoxLayout()
-        self.chk_metadata = QCheckBox("Embed Thumbnail & Metadata")
+        self.chk_metadata = QCheckBox("Embed Title/Artist Tags")
         self.chk_metadata.setChecked(True)
 
-        self.chk_archive = QCheckBox("Skip Already Downloaded (Archive)")
+        self.chk_thumbnail = QCheckBox("Embed Cover Art (downloads .webp)")
+        self.chk_thumbnail.setChecked(False)
+
+        self.chk_archive = QCheckBox("Skip Already Downloaded")
         self.chk_archive.setChecked(True)
 
         flags_row1.addWidget(self.chk_metadata)
-        flags_row1.addSpacing(14)
+        flags_row1.addSpacing(12)
+        flags_row1.addWidget(self.chk_thumbnail)
+        flags_row1.addSpacing(12)
         flags_row1.addWidget(self.chk_archive)
         flags_row1.addStretch()
         card_layout.addLayout(flags_row1)
 
-        # Resilience Row 2
+        # Resilience Row (Anti-403 Pacing + Always-Interactive Browser Cookies)
         flags_row2 = QHBoxLayout()
         self.chk_pacing = QCheckBox("Anti-403 Pacing (3-7s sleep)")
         self.chk_pacing.setChecked(True)
 
         self.chk_cookies = QCheckBox("Browser Cookies:")
         self.browser_combo = QComboBox()
-        self.browser_combo.addItems(["firefox", "chromium", "brave", "chrome", "vivaldi", "edge"])
-        self.browser_combo.setEnabled(False)
-        self.chk_cookies.toggled.connect(self.browser_combo.setEnabled)
+        self.browser_combo.addItems(["brave", "firefox", "chromium", "chrome", "vivaldi", "edge"])
+        self.browser_combo.activated.connect(lambda _: self.chk_cookies.setChecked(True))
 
         flags_row2.addWidget(self.chk_pacing)
         flags_row2.addSpacing(14)
@@ -435,7 +445,10 @@ class YTGrabWindow(QMainWindow):
             args.extend(["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mkv"])
 
         if self.chk_metadata.isChecked():
-            args.extend(["--embed-thumbnail", "--add-metadata"])
+            args.append("--add-metadata")
+
+        if self.chk_thumbnail.isChecked():
+            args.append("--embed-thumbnail")
 
         if self.chk_archive.isChecked():
             args.extend(["--download-archive", str(self.archive_file)])
