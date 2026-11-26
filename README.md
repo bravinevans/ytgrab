@@ -10,22 +10,18 @@ A lightweight desktop app for downloading YouTube videos, playlists, and auto-ge
 
 ## Installation
 
-### Option 1: Using an AUR helper (Recommended)
-If you use `yay` or `paru` on Arch, EndeavourOS, CachyOS, Manjaro, or WinX OS:
+### Option 1: One-command install from GitHub Releases (Recommended)
+Install the prebuilt Arch package directly with `pacman`:
 
 ```bash
-yay -S ytgrab
-```
-or
-```bash
-paru -S ytgrab
+sudo pacman -U [https://github.com/bravinevans/ytgrab/releases/download/v0.4.0/ytgrab-0.4.0-1-any.pkg.tar.zst](https://github.com/bravinevans/ytgrab/releases/download/v0.4.0/ytgrab-0.4.0-1-any.pkg.tar.zst)
 ```
 
-### Option 2: Build and install manually from source
+### Option 2: Build from source with `makepkg`
 Clone the repo and let `makepkg` pull the dependencies (`python-pyqt6`, `yt-dlp`, and `ffmpeg`) and register the desktop launcher:
 
 ```bash
-git clone https://github.com/bravinevans/ytgrab.git
+git clone [https://github.com/bravinevans/ytgrab.git](https://github.com/bravinevans/ytgrab.git)
 cd ytgrab
 makepkg -si
 ```
@@ -37,13 +33,13 @@ If you already have `python-pyqt6`, `yt-dlp`, and `ffmpeg` installed, you can ru
 
 ```bash
 sudo pacman -S --needed python-pyqt6 yt-dlp ffmpeg
-git clone https://github.com/bravinevans/ytgrab.git
+git clone [https://github.com/bravinevans/ytgrab.git](https://github.com/bravinevans/ytgrab.git)
 cd ytgrab
 python3 ytgrab.py
 ```
 
 ## Updating & Uninstalling
-If you installed via `makepkg` or an AUR helper, remove it anytime with:
+Remove `ytgrab` anytime via `pacman`:
 
 ```bash
 sudo pacman -Rns ytgrab
