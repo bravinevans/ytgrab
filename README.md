@@ -25,7 +25,7 @@ paru -S ytgrab
 Clone the repo and let `makepkg` pull the dependencies (`python-pyqt6`, `yt-dlp`, and `ffmpeg`) and register the desktop launcher:
 
 ```bash
-git clone [https://github.com/bravinevans/ytgrab.git](https://github.com/bravinevans/ytgrab.git)
+git clone https://github.com/bravinevans/ytgrab.git
 cd ytgrab
 makepkg -si
 ```
@@ -37,7 +37,7 @@ If you already have `python-pyqt6`, `yt-dlp`, and `ffmpeg` installed, you can ru
 
 ```bash
 sudo pacman -S --needed python-pyqt6 yt-dlp ffmpeg
-git clone [https://github.com/bravinevans/ytgrab.git](https://github.com/bravinevans/ytgrab.git)
+git clone https://github.com/bravinevans/ytgrab.git
 cd ytgrab
 python3 ytgrab.py
 ```
