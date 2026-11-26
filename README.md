@@ -1,16 +1,52 @@
 # ytgrab
 
-A minimalist PyQt6 desktop GUI for `yt-dlp` built for Arch and Arch-based Linux distributions.
+A lightweight desktop app for downloading YouTube videos, playlists, and auto-generated mixes with `yt-dlp`. Built with Python and PyQt6 for Arch and Arch-based Linux distros.
 
-## Features
-- **Multi-URL Batch Queue:** Paste single or multiple links (one per line) and process them sequentially.
-- **Per-URL Auto-Detection:** Automatically distinguishes single videos, standard playlists, and YouTube `RD` Auto-Mixes (rewriting `list=RD...` URLs to their seed `/watch?v=...` form).
-- **Anti-403 Resilience:** Built-in request pacing (`--sleep-interval`), download deduplication archive, optional browser cookie extraction, and automatic cleanup of orphaned thumbnail files.
-- **Multiple Formats:** MP3 (V0), M4A, FLAC, 1080p MP4, and Best MKV.
+## What It Does
+- **Batch queue:** Paste one link or twenty (one per line). `ytgrab` works through them in order and tracks both overall queue progress and individual track percentages.
+- **Smart link handling:** Automatically tells standard playlists, single videos, and `RD` YouTube Mixes apart. For `RD` mixes, it rewrites the broken `/playlist?list=RD...` URL into the `/watch?v=...&list=RD...` format YouTube actually serves.
+- **Clean audio extraction:** Downloads only the audio stream when you pick MP3, M4A, or FLAC—no leftover `.webp` thumbnails cluttering your music folders unless you explicitly turn cover art on.
+- **Fewer 403 blocks:** Spaces out requests during bulk pulls, keeps a local archive of finished tracks so interrupted runs pick up where they left off, and lets you pass cookies from Brave, Firefox, Chromium, Chrome, Vivaldi, or Edge.
 
-## Installation (Arch / Arch-based)
+## Installation
+
+### Option 1: Using an AUR helper (Recommended)
+If you use `yay` or `paru` on Arch, EndeavourOS, CachyOS, Manjaro, or WinX OS:
+
 ```bash
-git clone https://github.com/bravinevans/ytgrab.git
+yay -S ytgrab
+```
+or
+```bash
+paru -S ytgrab
+```
+
+### Option 2: Build and install manually from source
+Clone the repo and let `makepkg` pull the dependencies (`python-pyqt6`, `yt-dlp`, and `ffmpeg`) and register the desktop launcher:
+
+```bash
+git clone [https://github.com/bravinevans/ytgrab.git](https://github.com/bravinevans/ytgrab.git)
 cd ytgrab
 makepkg -si
 ```
+
+Once installed, open **ytgrab** from your application menu or run `ytgrab` in any terminal.
+
+### Option 3: Run without installing
+If you already have `python-pyqt6`, `yt-dlp`, and `ffmpeg` installed, you can run the script directly:
+
+```bash
+sudo pacman -S --needed python-pyqt6 yt-dlp ffmpeg
+git clone [https://github.com/bravinevans/ytgrab.git](https://github.com/bravinevans/ytgrab.git)
+cd ytgrab
+python3 ytgrab.py
+```
+
+## Updating & Uninstalling
+If you installed via `makepkg` or an AUR helper, remove it anytime with:
+
+```bash
+sudo pacman -Rns ytgrab
+```
+
+Download history is stored in `~/.local/share/ytgrab/archive.txt`. Delete that file if you want to re-download tracks you already grabbed earlier.
