@@ -5,10 +5,9 @@ import sys
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from PyQt6.QtCore import QProcess
+from PyQt6.QtCore import QProcess, QStandardPaths
 from PyQt6.QtWidgets import (
     QApplication,
-    QButtonGroup,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -20,7 +19,6 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QRadioButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -47,7 +45,7 @@ QLabel#Muted {
     color: #8e9299;
     font-size: 12px;
 }
-QLineEdit, QComboBox, QSpinBox {
+QLineEdit, QComboBox, QSpinBox, QPlainTextEdit#UrlBox {
     background-color: #111214;
     border: 1px solid #32363c;
     border-radius: 4px;
@@ -55,7 +53,7 @@ QLineEdit, QComboBox, QSpinBox {
     color: #f0f2f5;
     selection-background-color: #3a414a;
 }
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit#UrlBox:focus {
     border: 1px solid #6b7280;
 }
 QPushButton {
@@ -109,7 +107,7 @@ QProgressBar::chunk {
     background-color: #9ca3af;
     border-radius: 3px;
 }
-QPlainTextEdit {
+QPlainTextEdit#LogBox {
     background-color: #0e0f11;
     border: 1px solid #26292e;
     border-radius: 4px;
@@ -151,14 +149,20 @@ class YTGrabWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ytgrab")
-        self.setMinimumSize(700, 590)
+        self.setMinimumSize(720, 640)
         self.process: QProcess | None = None
-        self.current_item = 1
-        self.total_items = 1
+        self.queue: list[str] = []
+        self.queue_index = 0
+        self.queue_total = 0
+        self.had_errors = False
+        self.cancelled = False
 
-        self.archive_dir = Path.home() / ".local" / "share" / "ytgrab"
-        self.archive_dir.mkdir(parents=True, exist_ok=True)
-        self.archive_file = self.archive_dir / "archive.txt"
+        data_dir = Path(
+            QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
+            or (Path.home() / ".local" / "share" / "ytgrab")
+        )
+        data_dir.mkdir(parents=True, exist_ok=True)
+        self.archive_file = data_dir / "archive.txt"
 
         self._build_ui()
 
@@ -169,55 +173,67 @@ class YTGrabWindow(QMainWindow):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(12)
 
+        # Header
         header = QHBoxLayout()
         title = QLabel("ytgrab")
         title.setObjectName("Title")
-        subtitle = QLabel("yt-dlp media & playlist extractor")
+        subtitle = QLabel("Universal yt-dlp batch & playlist extractor")
         subtitle.setObjectName("Muted")
         header.addWidget(title)
         header.addWidget(subtitle)
         header.addStretch()
         layout.addLayout(header)
 
+        # Input Card
         card = QFrame()
         card.setObjectName("Card")
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(14, 14, 14, 14)
         card_layout.setSpacing(11)
 
-        url_row = QHBoxLayout()
-        self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("Paste YouTube video, playlist, or RD Auto-Mix link...")
-        self.url_input.textChanged.connect(self._on_url_changed)
-        paste_btn = QPushButton("Paste")
-        paste_btn.clicked.connect(self._paste_clipboard)
-        url_row.addWidget(self.url_input)
-        url_row.addWidget(paste_btn)
-        card_layout.addLayout(url_row)
-
-        mode_row = QHBoxLayout()
-        mode_row.addWidget(QLabel("Link Type:"))
-        self.radio_single = QRadioButton("Single Video")
-        self.radio_playlist = QRadioButton("Playlist")
-        self.radio_automix = QRadioButton("Auto-Mix (RD)")
-        self.radio_single.setChecked(True)
-
-        self.mode_group = QButtonGroup(self)
-        self.mode_group.addButton(self.radio_single)
-        self.mode_group.addButton(self.radio_playlist)
-        self.mode_group.addButton(self.radio_automix)
-
+        url_header = QHBoxLayout()
+        url_header.addWidget(QLabel("URLs (one per line):"))
         self.detected_badge = QLabel("Ready")
         self.detected_badge.setObjectName("Muted")
+        url_header.addStretch()
+        url_header.addWidget(self.detected_badge)
+        card_layout.addLayout(url_header)
 
-        mode_row.addWidget(self.radio_single)
-        mode_row.addWidget(self.radio_playlist)
-        mode_row.addWidget(self.radio_automix)
-        mode_row.addStretch()
-        mode_row.addWidget(self.detected_badge)
-        card_layout.addLayout(mode_row)
+        url_row = QHBoxLayout()
+        self.url_box = QPlainTextEdit()
+        self.url_box.setObjectName("UrlBox")
+        self.url_box.setFixedHeight(84)
+        self.url_box.setPlaceholderText(
+            "Paste one or more YouTube links (videos, playlists, or RD Auto-Mixes) — one per line..."
+        )
+        self.url_box.textChanged.connect(self._on_urls_changed)
 
+        url_btns = QVBoxLayout()
+        paste_btn = QPushButton("Paste")
+        paste_btn.clicked.connect(self._paste_clipboard)
+        clear_url_btn = QPushButton("Clear")
+        clear_url_btn.clicked.connect(self.url_box.clear)
+        url_btns.addWidget(paste_btn)
+        url_btns.addWidget(clear_url_btn)
+        url_btns.addStretch()
+
+        url_row.addWidget(self.url_box)
+        url_row.addLayout(url_btns)
+        card_layout.addLayout(url_row)
+
+        # Mode & Format Row
         opts_row = QHBoxLayout()
+        opts_row.addWidget(QLabel("Link Mode:"))
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems([
+            "Auto-Detect per URL (Recommended)",
+            "Force Single Video",
+            "Force Playlist",
+            "Force Auto-Mix (RD)",
+        ])
+        opts_row.addWidget(self.mode_combo)
+
+        opts_row.addSpacing(10)
         opts_row.addWidget(QLabel("Format:"))
         self.format_combo = QComboBox()
         self.format_combo.addItems([
@@ -229,16 +245,16 @@ class YTGrabWindow(QMainWindow):
         ])
         opts_row.addWidget(self.format_combo)
 
-        opts_row.addSpacing(12)
+        opts_row.addSpacing(10)
         opts_row.addWidget(QLabel("Max Tracks:"))
         self.limit_spin = QSpinBox()
         self.limit_spin.setRange(0, 500)
         self.limit_spin.setValue(30)
         self.limit_spin.setSpecialValueText("Unlimited")
         opts_row.addWidget(self.limit_spin)
-        opts_row.addStretch()
         card_layout.addLayout(opts_row)
 
+        # Resilience & Metadata Row 1
         flags_row1 = QHBoxLayout()
         self.chk_metadata = QCheckBox("Embed Thumbnail & Metadata")
         self.chk_metadata.setChecked(True)
@@ -252,13 +268,14 @@ class YTGrabWindow(QMainWindow):
         flags_row1.addStretch()
         card_layout.addLayout(flags_row1)
 
+        # Resilience Row 2
         flags_row2 = QHBoxLayout()
         self.chk_pacing = QCheckBox("Anti-403 Pacing (3-7s sleep)")
         self.chk_pacing.setChecked(True)
 
         self.chk_cookies = QCheckBox("Browser Cookies:")
         self.browser_combo = QComboBox()
-        self.browser_combo.addItems(["firefox", "chromium", "brave", "chrome"])
+        self.browser_combo.addItems(["firefox", "chromium", "brave", "chrome", "vivaldi", "edge"])
         self.browser_combo.setEnabled(False)
         self.chk_cookies.toggled.connect(self.browser_combo.setEnabled)
 
@@ -269,12 +286,13 @@ class YTGrabWindow(QMainWindow):
         flags_row2.addStretch()
         card_layout.addLayout(flags_row2)
 
+        # Output Folder Row
         out_row = QHBoxLayout()
         out_row.addWidget(QLabel("Save to:"))
-        default_dir = os.path.expanduser("~/Music")
-        if not os.path.isdir(default_dir):
-            default_dir = os.path.expanduser("~")
-        self.dir_input = QLineEdit(default_dir)
+        music_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.MusicLocation)
+        if not music_dir or not os.path.isdir(music_dir):
+            music_dir = os.path.expanduser("~")
+        self.dir_input = QLineEdit(music_dir)
         browse_btn = QPushButton("Browse")
         browse_btn.clicked.connect(self._choose_dir)
         out_row.addWidget(self.dir_input)
@@ -283,6 +301,7 @@ class YTGrabWindow(QMainWindow):
 
         layout.addWidget(card)
 
+        # Progress Section
         prog_header = QHBoxLayout()
         self.status_label = QLabel("Idle")
         self.track_label = QLabel("")
@@ -296,10 +315,13 @@ class YTGrabWindow(QMainWindow):
         self.progress_bar.setValue(0)
         layout.addWidget(self.progress_bar)
 
+        # Log Console
         self.log_box = QPlainTextEdit()
+        self.log_box.setObjectName("LogBox")
         self.log_box.setReadOnly(True)
         layout.addWidget(self.log_box)
 
+        # Action Buttons
         btn_row = QHBoxLayout()
         clear_btn = QPushButton("Clear Log")
         clear_btn.clicked.connect(self.log_box.clear)
@@ -311,7 +333,7 @@ class YTGrabWindow(QMainWindow):
 
         self.download_btn = QPushButton("Download")
         self.download_btn.setObjectName("Primary")
-        self.download_btn.clicked.connect(self._start_download)
+        self.download_btn.clicked.connect(self._start_queue)
 
         btn_row.addWidget(clear_btn)
         btn_row.addStretch()
@@ -319,51 +341,76 @@ class YTGrabWindow(QMainWindow):
         btn_row.addWidget(self.download_btn)
         layout.addLayout(btn_row)
 
+    def _get_urls(self) -> list[str]:
+        return [line.strip() for line in self.url_box.toPlainText().splitlines() if line.strip()]
+
     def _paste_clipboard(self):
         text = QApplication.clipboard().text()
-        if text:
-            self.url_input.setText(text.strip())
+        if not text:
+            return
+        existing = self.url_box.toPlainText().strip()
+        cleaned = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+        self.url_box.setPlainText(f"{existing}\n{cleaned}".strip() if existing else cleaned)
 
     def _choose_dir(self):
         chosen = QFileDialog.getExistingDirectory(self, "Select Output Directory", self.dir_input.text())
         if chosen:
             self.dir_input.setText(chosen)
 
-    def _on_url_changed(self, text: str):
-        mode, video_id, _ = parse_youtube_url(text)
-        if not text.strip():
+    def _on_urls_changed(self):
+        urls = self._get_urls()
+        if not urls:
             self.detected_badge.setText("Ready")
             return
 
-        if mode == "automix":
-            self.radio_automix.setChecked(True)
-            self.detected_badge.setText(f"Auto-detected: RD Mix (seed: {video_id or 'unknown'})")
-        elif mode == "playlist":
-            self.radio_playlist.setChecked(True)
-            self.detected_badge.setText("Auto-detected: Standard Playlist")
-        else:
-            self.radio_single.setChecked(True)
-            self.detected_badge.setText("Auto-detected: Single Video")
+        counts = {"single": 0, "playlist": 0, "automix": 0}
+        for u in urls:
+            mode, _, _ = parse_youtube_url(u)
+            counts[mode] += 1
 
-    def _build_command(self) -> tuple[str, list[str]]:
-        raw_url = self.url_input.text().strip()
+        if len(urls) == 1:
+            mode, video_id, _ = parse_youtube_url(urls[0])
+            labels = {
+                "automix": f"1 URL • RD Auto-Mix (seed: {video_id or 'unknown'})",
+                "playlist": "1 URL • Standard Playlist",
+                "single": "1 URL • Single Video",
+            }
+            self.detected_badge.setText(labels[mode])
+        else:
+            parts = [f"{v} {k}" for k, v in counts.items() if v > 0]
+            self.detected_badge.setText(f"{len(urls)} URLs queued ({', '.join(parts)})")
+
+    def _resolve_mode_for_url(self, raw_url: str) -> str:
+        choice = self.mode_combo.currentIndex()
+        if choice == 1:
+            return "single"
+        if choice == 2:
+            return "playlist"
+        if choice == 3:
+            return "automix"
+        mode, _, _ = parse_youtube_url(raw_url)
+        return mode
+
+    def _build_command(self, raw_url: str) -> tuple[str, list[str]]:
+        mode = self._resolve_mode_for_url(raw_url)
         _, video_id, list_id = parse_youtube_url(raw_url)
         out_dir = self.dir_input.text().strip() or os.path.expanduser("~")
 
         args = ["--newline", "--progress", "--ignore-errors"]
-        is_batch = self.radio_automix.isChecked() or self.radio_playlist.isChecked()
+        is_batch = mode in ("automix", "playlist")
 
-        if self.radio_automix.isChecked():
-            if list_id and video_id:
-                target_url = f"https://www.youtube.com/watch?v={video_id}&list={list_id}"
-            else:
-                target_url = raw_url
+        if mode == "automix":
+            target_url = (
+                f"https://www.youtube.com/watch?v={video_id}&list={list_id}"
+                if (list_id and video_id)
+                else raw_url
+            )
             args.append("--yes-playlist")
             if self.limit_spin.value() > 0:
                 args.extend(["--playlist-end", str(self.limit_spin.value())])
             out_template = os.path.join(out_dir, "%(playlist_title)s", "%(playlist_index)s - %(title)s.%(ext)s")
 
-        elif self.radio_playlist.isChecked():
+        elif mode == "playlist":
             target_url = raw_url
             args.append("--yes-playlist")
             if self.limit_spin.value() > 0:
@@ -418,29 +465,47 @@ class YTGrabWindow(QMainWindow):
         if removed:
             self.log_box.appendPlainText(f"[ytgrab] Cleaned up {removed} orphaned thumbnail file(s).")
 
-    def _start_download(self):
-        raw_url = self.url_input.text().strip()
-        if not raw_url:
-            self.status_label.setText("Enter a URL first.")
+    def _start_queue(self):
+        urls = self._get_urls()
+        if not urls:
+            self.status_label.setText("Paste at least one URL first.")
             return
 
-        cmd, args = self._build_command()
+        self.queue = urls
+        self.queue_index = 0
+        self.queue_total = len(urls)
+        self.had_errors = False
+        self.cancelled = False
+
         self.log_box.clear()
+        self.download_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(True)
+        self._run_next_in_queue()
+
+    def _run_next_in_queue(self):
+        if self.cancelled or self.queue_index >= self.queue_total:
+            self._finish_queue()
+            return
+
+        current_url = self.queue[self.queue_index]
+        self.queue_index += 1
+
+        cmd, args = self._build_command(current_url)
+        self.log_box.appendPlainText(f"\n=== Queue [{self.queue_index}/{self.queue_total}] ===")
         self.log_box.appendPlainText(f"$ {cmd} {' '.join(args)}\n")
 
         self.progress_bar.setValue(0)
-        self.status_label.setText("Starting yt-dlp...")
-        self.track_label.setText("")
-        self.download_btn.setEnabled(False)
-        self.cancel_btn.setEnabled(True)
+        self.status_label.setText(f"Queue {self.queue_index}/{self.queue_total}: Starting...")
+        self.track_label.setText(f"URL {self.queue_index} of {self.queue_total}")
 
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._on_process_output)
-        self.process.finished.connect(self._on_process_finished)
+        self.process.finished.connect(self._on_item_finished)
         self.process.start(cmd, args)
 
     def _cancel_download(self):
+        self.cancelled = True
         if self.process and self.process.state() != QProcess.ProcessState.NotRunning:
             self.status_label.setText("Cancelling...")
             self.process.terminate()
@@ -451,6 +516,7 @@ class YTGrabWindow(QMainWindow):
         if not self.process:
             return
         data = bytes(self.process.readAllStandardOutput()).decode("utf-8", errors="replace")
+        prefix = f"URL {self.queue_index}/{self.queue_total}"
         for line in data.splitlines():
             clean = line.strip()
             if not clean:
@@ -458,34 +524,41 @@ class YTGrabWindow(QMainWindow):
 
             item_match = re.search(r"Downloading item (\d+) of (\d+)", clean)
             if item_match:
-                self.current_item = int(item_match.group(1))
-                self.total_items = int(item_match.group(2))
-                self.track_label.setText(f"Track {self.current_item} of {self.total_items}")
+                cur, tot = item_match.group(1), item_match.group(2)
+                self.track_label.setText(f"{prefix} • Track {cur} of {tot}")
 
             pct_match = re.search(r"\[download\]\s+(\d+(?:\.\d+)?)%", clean)
             if pct_match:
                 pct = float(pct_match.group(1))
                 self.progress_bar.setValue(int(pct))
-                self.status_label.setText(f"Downloading... {pct:.1f}%")
+                self.status_label.setText(f"{prefix}: Downloading... {pct:.1f}%")
                 continue
 
             if "Sleeping" in clean and "seconds" in clean:
-                self.status_label.setText("Pacing requests (anti-403 sleep)...")
+                self.status_label.setText(f"{prefix}: Pacing requests (anti-403 sleep)...")
 
             if "[ExtractAudio]" in clean:
-                self.status_label.setText("Converting audio with ffmpeg...")
+                self.status_label.setText(f"{prefix}: Converting audio with ffmpeg...")
 
             self.log_box.appendPlainText(clean)
 
-    def _on_process_finished(self, exit_code: int, _exit_status):
+    def _on_item_finished(self, exit_code: int, _exit_status):
+        if exit_code != 0:
+            self.had_errors = True
+        self._run_next_in_queue()
+
+    def _finish_queue(self):
         self.download_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
         self._cleanup_orphaned_thumbnails()
-        if exit_code == 0:
+
+        if self.cancelled:
+            self.status_label.setText("Cancelled by user")
+        elif not self.had_errors:
             self.progress_bar.setValue(100)
-            self.status_label.setText("Completed")
+            self.status_label.setText(f"Completed ({self.queue_total} URL{'s' if self.queue_total != 1 else ''})")
         else:
-            self.status_label.setText(f"Finished with warnings/errors (code {exit_code})")
+            self.status_label.setText("Queue finished with some warnings/errors (see log)")
 
 
 def main():
