@@ -10,14 +10,7 @@ A lightweight desktop app for downloading YouTube videos, playlists, and auto-ge
 
 ## Installation
 
-### Option 1: One-command install from GitHub Releases (Recommended)
-Install the prebuilt Arch package directly with `pacman`:
-
-```bash
-sudo pacman -U [https://github.com/bravinevans/ytgrab/releases/download/v0.4.0/ytgrab-0.4.0-1-any.pkg.tar.zst](https://github.com/bravinevans/ytgrab/releases/download/v0.4.0/ytgrab-0.4.0-1-any.pkg.tar.zst)
-```
-
-### Option 2: Build from source with `makepkg`
+### Build and install with `makepkg` (Recommended)
 Clone the repo and let `makepkg` pull the dependencies (`python-pyqt6`, `yt-dlp`, and `ffmpeg`) and register the desktop launcher:
 
 ```bash
@@ -28,7 +21,7 @@ makepkg -si
 
 Once installed, open **ytgrab** from your application menu or run `ytgrab` in any terminal.
 
-### Option 3: Run without installing
+### Run without installing
 If you already have `python-pyqt6`, `yt-dlp`, and `ffmpeg` installed, you can run the script directly:
 
 ```bash
@@ -39,6 +32,14 @@ python3 ytgrab.py
 ```
 
 ## Updating & Uninstalling
+To update later, pull the latest commits and rebuild:
+
+```bash
+cd ytgrab
+git pull
+makepkg -si
+```
+
 Remove `ytgrab` anytime via `pacman`:
 
 ```bash
