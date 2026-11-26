@@ -2,6 +2,8 @@
 
 A lightweight desktop app for downloading YouTube videos, playlists, and auto-generated mixes with `yt-dlp`. Built with Python and PyQt6 for Arch and Arch-based Linux distros.
 
+![ytgrab screenshot](assets/screenshot.png)
+
 ## What It Does
 - **Batch queue:** Paste one link or twenty (one per line). `ytgrab` works through them in order and tracks both overall queue progress and individual track percentages.
 - **Smart link handling:** Automatically tells standard playlists, single videos, and `RD` YouTube Mixes apart. For `RD` mixes, it rewrites the broken `/playlist?list=RD...` URL into the `/watch?v=...&list=RD...` format YouTube actually serves.
